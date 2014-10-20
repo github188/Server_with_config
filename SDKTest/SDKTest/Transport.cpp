@@ -793,17 +793,17 @@ void readConfig(void)
 					ipcIP = temp2;
 					cout<<"SET IPC IP = "<<ipcIP<<endl;
 				}
-				if(temp1 == "IPCPORT")
+				if(temp1 == "IPC_PORT")
 				{
 					ipcPort = atoi(temp2.data());
 					cout<<"SET IPCPORT = "<<ipcPort<<endl;
 				}
-				if(temp1 == "SERVER_REC_PORT")
+				if(temp1 == "SERVER_RECIEVE_PORT")
 				{
 					serverRecPort = atoi(temp2.data());
 					cout<<"SET SERVER_REC_PORT = "<<serverRecPort<<endl;
 				}
-				if(temp1 == "CLIENTCOMMANDPORT")
+				if(temp1 == "CLIENT_COMMAND_PORT")
 				{
 					clientCommandPort = atoi(temp2.data());
 					cout<<"SET CLIENTCOMMANDPORT = "<<clientCommandPort<<endl;
