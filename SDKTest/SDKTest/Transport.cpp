@@ -8,6 +8,7 @@
 #include <iostream>
 #include <string> 
 #include <fstream>
+#include "ServerInfo.h"
 #pragma comment(lib,"ws2_32.lib")
 //command,retranPort
 
@@ -26,6 +27,15 @@ int clientCommandPort=0;
 int retranport=0;
 //控制端口
 int commandport=0;
+//负载均衡服务器配置项 2014.10.31  Serge
+std::string balanceServerIP="";
+int  balanceListenPort=0;
+int bitRate=0;
+int	frame_rate=0;
+int	resolution=0;
+
+
+
 void readConfig(void);
 
 IPCInfo ipcInfo(" ,0, , ,0",true);
@@ -735,8 +745,56 @@ DWORD WINAPI GettingCommandFromClient(LPVOID lpParameter){
 	return 0;
 }
 
+//Serge 2014.10.31
+DWORD WINAPI  connectToBalanceServer(LPVOID lpParameter)
+{
+	WORD wVersionRequested;
+    WSADATA wsaData;
+    int err;
+	wVersionRequested = MAKEWORD(1, 1);
+    err = WSAStartup(wVersionRequested, &wsaData);
+    if (err != 0) {                                 
+        printf("WSAStartup failed with error: %d\n", err);
+        return 1;
+    }
+    if (LOBYTE(wsaData.wVersion) != 1 || HIBYTE(wsaData.wVersion) != 1) {
+        printf("Could not find a usable version of Winsock.dll\n");
+        WSACleanup();
+        return 1;
+    }
+    else
+        printf("The Winsock 1.1 dll was found okay\n");
+
+	SOCKET sockServerToBanlance=socket(AF_INET,SOCK_DGRAM,0);
 
 
+	SOCKADDR_IN addrBalanSrv;
+	addrBalanSrv.sin_addr.S_un.S_addr=inet_addr(balanceServerIP.c_str());
+	addrBalanSrv.sin_family = AF_INET;
+	addrBalanSrv.sin_port = balanceListenPort;
+	serverConnectRequst temp;
+	temp.bitRate=bitRate;
+	//login list
+	temp.flag=1;
+	temp.frame_rate=frame_rate;
+	temp.resolution=resolution;
+	temp.serverCommandPort=commandport;
+	temp.serverDataPort=clientCommandPort;
+	temp.serverIp=serverIP;
+	temp.serverRetranPort=retranport;
+	char sendbuf[200];
+	
+	while(1)
+	{
+		for(int i=0;i<200;i++)
+		{
+			sendbuf[i]=((char*)(&temp))[i];
+		}
+		sendto(sockServerToBanlance,sendbuf,200,0,(SOCKADDR *)&addrBalanSrv,sizeof(addrBalanSrv));
+		Sleep(10000);
+	}
+	return 1;
+}
 
 //配置项文件 serge 2014.10.16 
 //裁剪字符串两边空格
@@ -818,6 +876,31 @@ void readConfig(void)
 					commandport = atoi(temp2.data());
 					cout<<"SET COMMAND_PORT = "<<commandport<<endl;
 				}
+					if(temp1 == "BALANCE_SERVER_IP")
+				{
+					balanceServerIP =temp2;
+					cout<<"SET BALANCE_SERVER_IP = "<<balanceServerIP<<endl;
+				}
+				if(temp1 == "BALANCE_LISTEN_PORT")
+				{
+					balanceListenPort = atoi(temp2.data());
+					cout<<"SET BALANCE_LISTEN_PORT = "<<balanceListenPort<<endl;
+				}
+				if(temp1 == "FRAME_RATE")
+				{
+					frame_rate = atoi(temp2.data());
+					cout<<"SET FRAME_RATE = "<<frame_rate<<endl;
+				}
+				if(temp1 == "RESOLUTION")
+				{
+					resolution = atoi(temp2.data());
+					cout<<"SET RESOLUTION = "<<resolution<<endl;
+				}
+				if(temp1 == "BITRATE")
+				{
+					bitRate = atoi(temp2.data());
+					cout<<"SET BITRATE = "<<bitRate<<endl;
+				}
 			}
 		}
 
@@ -837,6 +920,16 @@ void readConfig(void)
 			cout<<"read config error,retranport is 0\n";
 		if(commandport==0)
 			cout<<"read config error,commandport is 0\n";
+		if(balanceServerIP=="")
+			cout<<"read config error,balanceServerIP is blank\n";
+		if(balanceListenPort==0)
+			cout<<"read config error,balanceListenPort is 0\n";
+		if(frame_rate==0)
+			cout<<"read config error,frame_rate is 0\n";
+		if(resolution==0)
+			cout<<"read config error,resolution is 0\n";
+		if(bitRate==0)
+			cout<<"read config error,bitRate is 0\n";
 	}
 	else
 	{
@@ -934,9 +1027,11 @@ int main(int argc,char *argv[])
 
 	hThread7=CreateThread(NULL,0,RetranTreat,0,0,&ThreadID7);
 	
-	
+	hThread3=CreateThread(NULL,0,connectToBalanceServer,0,0,&ThreadID3);
+
 	WaitForSingleObject(hThread1,INFINITE);
-	system("PAUSE");
+	Sleep(-1);
+	//system("PAUSE");
 	//CloseHandle(hThread1);
 	
 }
