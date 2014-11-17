@@ -19,7 +19,7 @@ public:
 		EnterCriticalSection( &CS);
 		while(buffqueue.size()>0)
 		buffqueue.pop();
-	LeaveCriticalSection( &CS);
+		LeaveCriticalSection( &CS);
 	}
 	~BuffQueue();
 };

@@ -53,38 +53,18 @@ int RestoreBuffer::applyData(long id,int sqnum,int timestamp,RestoreCell* rc){
 	low=tid;
 	if(up>=m_size)up=0;
 	while(up!=low){
-		//if(flag==0){
-		//	EnterCriticalSection( &CS);
 			if(m_restore_cells[up].timestamp==timestamp&&m_restore_cells[up].sqnum== sqnum){
 				rc->size=m_restore_cells[up].size;
 				memcpy(rc->data,m_restore_cells[up].data,m_restore_cells[up].size+sizeof(long)+sizeof(int));
 			    rc->timestamp=m_restore_cells[up].timestamp;
 			    rc->sqnum=m_restore_cells[up].sqnum;
 				rc->id=m_restore_cells[up].id;
-			LeaveCriticalSection( &CS);
-			return 0;
+				LeaveCriticalSection( &CS);
+				return 0;
 		    }
-			//LeaveCriticalSection( &CS);
-		//	flag=1;
 			up++;
 			if(up>=m_size)up=0;
-		//}
-	/*	if(flag==1){
-		//	EnterCriticalSection( &CS);
-			if(m_restore_cells[low].timestamp==timestamp&&m_restore_cells[low].sqnum== sqnum){
-				rc->size=m_restore_cells[up].size;
-			    memcpy(rc->data,m_restore_cells[low].data,m_restore_cells[low].size+sizeof(long));
-			    rc->timestamp=m_restore_cells[low].timestamp;
-			    rc->sqnum=m_restore_cells[low].sqnum;
-			LeaveCriticalSection( &CS);
-			return 0;
-		}
-		//	LeaveCriticalSection( &CS);
-			flag=0;
-			low--;
-			if(low<0)low=m_size-1;
-		}
-	*/
+		
 	}
 	LeaveCriticalSection( &CS);
 	return -1;

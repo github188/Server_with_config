@@ -13,7 +13,7 @@
 //command,retranPort
 
 int TimeOut=1000;
-int buffer=50000;
+int sock_recv_buffer=50000;	// socket receive buffer的大小
 
 //2014.10.16  Serge ，config data
 std::string serverIP="";
@@ -49,7 +49,7 @@ CRITICAL_SECTION CS;
 CRITICAL_SECTION SendLock;
 
 long id=0;
-int restoresize=10000;
+int restoresize=10000;		// 重传缓冲区的大小
 RestoreBuffer rsb;
 
 /* 2014-05-16: Jasmine, udp_connection_test; added...*/
@@ -93,7 +93,7 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
     { 
 		SOCKADDR_IN addr; 
 		setsockopt(sockSrv,SOL_SOCKET,SO_RCVTIMEO,(char*)&TimeOut,sizeof(TimeOut));
-		setsockopt(sockSrv,SOL_SOCKET,SO_RCVBUF ,(char*)&buffer,sizeof(buffer));
+		setsockopt(sockSrv,SOL_SOCKET,SO_RCVBUF ,(char*)&sock_recv_buffer,sizeof(sock_recv_buffer));
         char recvbuf[1500]; 
         int size=recvfrom(sockSrv,recvbuf,1500,0,(SOCKADDR*)&addr,&len);
 
@@ -107,11 +107,6 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 				ipcInfo.restartGetData(serverIP);
 			}
 		}
-		//else
-			//printf("package size :%d\n",size);
-	
-		//需要冲突保护
-		//EnterCriticalSection( &CS);
 
 		if(!ipcInfo.is_connect_ipc && size>0)
 		{
@@ -128,10 +123,6 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 				sendto(sockSrv,command.c_str(),command.length()+1,0,(SOCKADDR*)&addr,sizeof(SOCKADDR));
 			}
 		}
-		/*else
-		{
-			std::cout<<"get no video data."<<std::endl;
-		}*/
 
 
 		if(ipcInfo.hasVideoClients())
@@ -162,8 +153,6 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 					memcpy(pkg->value,&id,sizeof(long));
 					memcpy(pkg->value+sizeof(long),&topsqnum,sizeof(int));
 					memcpy(pkg->value+sizeof(long)+sizeof(int),recvbuf,size);
-					//memcpy(pkg->value,recvbuf,size);
-					//printf("addr:%p\n",&pkg);
 					ipcInfo.video_pq.priority_queue_enqueue(pkg);
 		
 					//printf("sqnum: %d  timestamp:%d\n",rtp_header->seq/256,(rtp_header->timestamp & 0x0000ffff)/256);
@@ -188,20 +177,7 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 					memcpy(&priority,recvbuf+sizeof(long),sizeof(int));
 					
 					memcpy(&topsqnum,recvbuf+sizeof(long)+sizeof(int),sizeof(int));
-					//printf("topsqnum:%d\n",topsqnum);
-					//id++;
-					//priority++;
-					//cout<<"package id::"<<priority<<endl;
 					PRTP_header rtp_header = (PRTP_header)(recvbuf+sizeof(long)+2*sizeof(int));
-					/*int newtmp=rtp_header->timestamp;
-					if(newtmp!=timestmp)
-					{
-						topsqnum=rtp_header->seq/256;
-						timestmp=newtmp;
-					}*/
-					//printf("get data and have clients\n");
-
-					//std::cout<<"id:"<<id<<std::endl;
 					std::cout<<"priority size:"<<ipcInfo.video_pq.priority_queue_size()<<std::endl;
 
 					KeyValue*  pkg=new KeyValue();
@@ -215,8 +191,7 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 					memcpy(pkg->value,&id,sizeof(long));
 					memcpy(pkg->value+sizeof(long),&topsqnum,sizeof(int));
 					memcpy(pkg->value+sizeof(long)+sizeof(int),recvbuf+sizeof(long)+2*sizeof(int),size-sizeof(long)-2*sizeof(int));
-					//memcpy(pkg->value,recvbuf,size);
-					//printf("addr:%p\n",&pkg);
+					
 					ipcInfo.video_pq.priority_queue_enqueue(pkg);
 
 		
@@ -245,14 +220,8 @@ DWORD WINAPI StartGetIPCData(LPVOID lpParameter)
 		}
 		else
 		{
-
-			//printf("no clients:video------------%d\n",ipcInfo.video_pq.priority_queue_size());
-			//videoNum++;
-			//std::cout<<"video num:"<<videoNum<<std::endl;
 			ipcInfo.video_pq.priority_pop_all();
-			//break;
 		}
-		//LeaveCriticalSection( &CS);
 	}
 	return 0;
 }
@@ -336,33 +305,14 @@ DWORD WINAPI StartGetIPCAudioData(LPVOID lpParameter)
 		}
 		else
 		{
-			//printf("no clients：audio\n");
 			ipcInfo.audio_bq.popall();
 		}
-		//LeaveCriticalSection( &CS);
 	}
 	return 0;
 }
 
 DWORD WINAPI SendIPC_VideoData(LPVOID lpParameter)
 {
-	/*
-	WORD wVersionRequested; 
-    WSADATA wsaData; 
-    int err; 
-    wVersionRequested = MAKEWORD(1,1); 
-    err = WSAStartup(wVersionRequested,&wsaData); 
-    if ( err != 0 ) { 
-        return -1; 
-    } 
-    if ( LOBYTE( wsaData.wVersion ) != 1 || 
-        HIBYTE( wsaData.wVersion ) != 1) { 
-            WSACleanup( ); 
-            return -1; 
-    } 
-
-    SOCKET sockSrv=socket(AF_INET,SOCK_DGRAM,0);
-	*/
 	int len=sizeof(SOCKADDR); 	
 	
 	while(1) 
@@ -378,12 +328,8 @@ DWORD WINAPI SendIPC_VideoData(LPVOID lpParameter)
 			ipcInfo.getVideoClientInfos(cls);
 			for(int i=0;i<cls.size();i++){
 				int tuid = atoi(&(*cls[i]->user.c_str()));
-				//printf("id1:%d id2:%d\n",tuid,pkg.uid);
 				if(tuid==pkg->user_id){
-				   printf("send retans data");
-				   /* Jasmine, commented */
-				   // sendto(sockSrv,pkg->value,pkg->pkgsize+sizeof(long)+sizeof(int),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
-				   /* Jasmine, commented */
+				   printf("send retransmit data");
 				   sendto(mServSock,pkg->value,pkg->pkgsize+sizeof(long)+sizeof(int),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
 				   break;
 				}
@@ -408,15 +354,9 @@ DWORD WINAPI SendIPC_VideoData(LPVOID lpParameter)
 
 				EnterCriticalSection( &SendLock);
 
-				/* Jasmine, commented */
-				// sendto(sockSrv,pkg->value,pkg->pkgsize+sizeof(long)+sizeof(int),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
-				/* Jasmine, commented */
 				sendto(mServSock,pkg->value,pkg->pkgsize+sizeof(long)+sizeof(int),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
 				
 				LeaveCriticalSection( &SendLock);
-				
-				/* Jasmine 2014-05-14: udp_connection_test */
-				// printf("send data to %s , port %d  \n",inet_ntoa(cls[i]->addr.sin_addr),ntohs(cls[i]->addr.sin_port));
 				
 			}
 			key_value_free(pkg,NULL);
@@ -443,23 +383,6 @@ DWORD WINAPI SendIPC_VideoData(LPVOID lpParameter)
 
 DWORD WINAPI SendIPC_AudioData(LPVOID lpParameter)
 {
-	/* jasmine, old socket......
-	WORD wVersionRequested; 
-    WSADATA wsaData; 
-    int err; 
-    wVersionRequested = MAKEWORD(1,1); 
-    err = WSAStartup(wVersionRequested,&wsaData); 
-    if ( err != 0 ) { 
-        return -1; 
-    } 
-    if ( LOBYTE( wsaData.wVersion ) != 1 || 
-        HIBYTE( wsaData.wVersion ) != 1) { 
-            WSACleanup( ); 
-            return -1; 
-    } 
-
-    SOCKET sockSrv=socket(AF_INET,SOCK_DGRAM,0);
-	
 	int len=sizeof(SOCKADDR); 	
 	
 	while(1) 
@@ -474,52 +397,11 @@ DWORD WINAPI SendIPC_AudioData(LPVOID lpParameter)
 			
 			for(int i=0;i<cls.size();i++)
 			{
-				//printf("clientsize %d\n",cls.size());
-
 				EnterCriticalSection( &SendLock);
-				//* Jasmine, commented
-				sendto(sockSrv,audioPkg.buff,audioPkg.buffsize+sizeof(long),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
-				// Jasmine, added
-				// sendto(mServSock,audioPkg.buff,audioPkg.buffsize+sizeof(long),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
-
-				LeaveCriticalSection( &SendLock);
-			}
-			
-			//Sleep(1);
-		}
-		else{
-			if(!ipcInfo.hasAudioClients())ipcInfo.audio_bq.popall();
-			Sleep(1);
-		}
-
-	}
-	*/
-	int len=sizeof(SOCKADDR); 	
-	
-	while(1) 
-    { 
-		vector<Client*> cls;
-		
-		if(ipcInfo.hasAudioClients() && ipcInfo.audio_bq.getdatanum()>0)
-		{
-			package audioPkg=ipcInfo.audio_bq.popdata();     //从音频缓冲区取数据发往客户端
-			ipcInfo.getAudioClientInfos(cls);
-			//printf("%d\n",cls.size());
-			
-			for(int i=0;i<cls.size();i++)
-			{
-				//printf("clientsize %d\n",cls.size());
-
-				EnterCriticalSection( &SendLock);
-				//* Jasmine, commented, old socket version
-				// sendto(sockSrv,audioPkg.buff,audioPkg.buffsize+sizeof(long),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
-				// Jasmine, added
 				sendto(mServSock,audioPkg.buff,audioPkg.buffsize+sizeof(long),0,(SOCKADDR*)&cls[i]->addr,sizeof(SOCKADDR));
 
 				LeaveCriticalSection( &SendLock);
 			}
-			
-			//Sleep(1);
 		}
 		else{
 			if(!ipcInfo.hasAudioClients())ipcInfo.audio_bq.popall();
@@ -667,7 +549,7 @@ int treatCommand(string commd,int size,SOCKADDR_IN addrClient)
 	vector<string> _str;
 	::split(str,_str);
 	Command comheadn=Command(atoi(_str[0].c_str()));
-	printf("commad: %d, uid: %s, text: %s \n",comheadn, _str[1].c_str(), _str[2].c_str());
+	printf("command: %d, uid: %s, text: %s \n",comheadn, _str[1].c_str(), _str[2].c_str());
 	switch(comheadn){
 	case applyIPCData:treatApplyVideoData(addrClient,_str[1],_str[2]);break;
 	case stopIPCData:treatStopIPCData(addrClient,_str[1],_str[2]);break;
@@ -696,17 +578,6 @@ DWORD WINAPI GettingCommandFromClient(LPVOID lpParameter){
             return -1; 
     } 
 
-	/* 2014-05-16: Jasmine: udp_conenction_test; commented */
-	/*
-    mServSock=socket(AF_INET,SOCK_DGRAM,0);
-
-    SOCKADDR_IN addrSrv;
-    addrSrv.sin_addr.S_un.S_addr=htonl(INADDR_ANY);
-    addrSrv.sin_family=AF_INET;
-    addrSrv.sin_port=htons(ClientCommandPort);
-
-    bind(mServSock,(sockaddr*)&addrSrv,sizeof(SOCKADDR)); 
-	*/
     
     int len=sizeof(SOCKADDR); 
 	int bufsize = 0;
@@ -716,10 +587,6 @@ DWORD WINAPI GettingCommandFromClient(LPVOID lpParameter){
 		SOCKADDR_IN addrClient; 
 		printf("start recv\n");
 		char recvbuf[200];
-		//::setsockopt(sockconn,SOL_SOCKET,SO_RCVTIMEO,(char*)&TimeOut,sizeof(TimeOut));   
-        /* 2014-05-17: Jasmine changed ...*/
-		// char recvbuf[200]; 
-        // int size=recvfrom(sockSrv,recvbuf,200,0,(SOCKADDR*)&addrClient,&len);
 		bufsize = recvfrom(mServSock,recvbuf,200,0,(SOCKADDR*)&addrClient,&len);
 		// printf("welcome %s to UPD server port %d\n",inet_ntoa(addrClient.sin_addr),addrClient.sin_port);
 		if( bufsize > 0){
@@ -728,19 +595,6 @@ DWORD WINAPI GettingCommandFromClient(LPVOID lpParameter){
 			printf("command:%s, buffer_size: %d \n",recvbuf, bufsize);
 			treatCommand(str,bufsize,addrClient);
 		}
-		/*
-		void treatApplyVideoData(SOCKADDR_IN addrClient,string user,string psd){
-			printf("sending normal data to port :%d \n",ntohs(addrClient.sin_port));
-			Client client;
-			client.addr=addrClient;
-			client.user=user;
-			client.psd=psd;
-			//需要冲突保护
-			EnterCriticalSection( &CS);
-			ipcInfo.addVideoClient(client);
-			LeaveCriticalSection( &CS);
-		}
-		*/
     } 
 	return 0;
 }
@@ -983,19 +837,6 @@ int main(int argc,char *argv[])
     bind(mServSock,(sockaddr*)&addrSrv,sizeof(SOCKADDR)); 
 	//////////////////////////////////////////////////////
 
-	SOCKET sock_send_svr_register;
-    sock_send_svr_register=socket(AF_INET,SOCK_DGRAM,0);
-
-	SOCKADDR_IN loginSvrAddr;
-	loginSvrAddr.sin_addr.S_un.S_addr=inet_addr("192.168.1.101");  //Login服务器的地址
-    loginSvrAddr.sin_family=AF_INET;
-    loginSvrAddr.sin_port=htons(65000);
-
-	
-	string svrRegisterInfo="";
-	svrRegisterInfo=svrRegisterInfo+ipcInfo.ipc_ip+";"+serverIP+":"+intToStr(clientCommandPort);
-	sendto(sock_send_svr_register,svrRegisterInfo.c_str(),svrRegisterInfo.length()+1,0,(SOCKADDR*)&loginSvrAddr,sizeof(SOCKADDR));//发送指令
-
 	HANDLE hThread1;
 	HANDLE hThread2;
 	HANDLE hThread3;
@@ -1031,8 +872,6 @@ int main(int argc,char *argv[])
 
 	WaitForSingleObject(hThread1,INFINITE);
 	Sleep(-1);
-	//system("PAUSE");
-	//CloseHandle(hThread1);
 	
 }
 
